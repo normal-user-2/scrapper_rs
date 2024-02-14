@@ -1,10 +1,8 @@
-use entity::{enums::Site, page};
+use entity::enums::Site;
 
-use crate::scrapper::scrapper::Scrapper;
-use sea_orm::{ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::DatabaseConnection;
 
 use super::jfl::{self};
-use entity::page::Entity as Page;
 
 pub struct ExtWeb {
     db: DatabaseConnection,

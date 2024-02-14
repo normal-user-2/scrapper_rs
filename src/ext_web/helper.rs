@@ -1,26 +1,31 @@
+use chrono::Utc;
 use entity::enums::Site;
 use entity::page;
 use entity::page::Entity as Page;
 use reqwest;
 use roxmltree;
-use sea_orm::{prelude::TimeDate, ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter, Set};
-use chrono::{Utc, NaiveDateTime};
-
+use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, Set};
 
 // fetch_sitemap is a helper function to fetch sitemap from a given url
 pub async fn fetch_sitemap(sitemap_url: &str) -> Vec<String> {
     let mut urls: Vec<String> = Vec::new();
 
     let resp = reqwest::get(sitemap_url).await;
-    if resp.is_err() {
-        return urls;
-    }
+    
+    match resp {
+        Ok(body) => {
+            let body: String = body.text().await.unwrap();
 
-    let body: String = resp.unwrap().text().await.unwrap();
-    let xml = roxmltree::Document::parse(&body).unwrap();
+            let xml = roxmltree::Document::parse(&body).unwrap();
 
-    for url in xml.descendants().filter(|n| n.has_tag_name("loc")) {
-        urls.push(url.text().unwrap().to_string());
+            for url in xml.descendants().filter(|n| n.has_tag_name("loc")) {
+                urls.push(url.text().unwrap().to_string());
+            }
+        }
+        Err(e) => {
+            println!("Failed to fetch sitemap: {:?}", e);
+            return urls;
+        }
     }
 
     urls
@@ -36,9 +41,8 @@ pub async fn save_location(site: Site, loc: &String, db: &sea_orm::DatabaseConne
         .one(db)
         .await;
 
-
     match page {
-        Ok(Some(page)) => {
+        Ok(Some(_page)) => {
             return;
         }
         Ok(None) => {
