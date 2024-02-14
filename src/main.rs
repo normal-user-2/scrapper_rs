@@ -12,8 +12,6 @@ const DATABASE_URL: &str = "postgres://postgres:postgres@localhost:5432";
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db = get_db().await;
 
-    Migrator::up(&db, None).await.expect("failed to migrate");
-
     let ews = ExtWeb::new(db);
 
     ews.sync().await;
@@ -25,5 +23,8 @@ async fn get_db() -> DatabaseConnection {
     let db = Database::connect(&format!("{}/{}", DATABASE_URL, DB_NAME))
         .await
         .expect("failed to connect to db");
+
+    Migrator::up(&db, None).await.expect("failed to migrate");
+
     db
 }
