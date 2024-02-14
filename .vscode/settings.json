@@ -1,0 +1,12 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "./Cargo.toml",
+        "./Cargo.toml",
+        "./Cargo.toml",
+        "./migration/Cargo.toml"
+    ],
+    "rust-analyzer.inlayHints.typeHints.hideClosureInitialization": true,
+    "rust-analyzer.inlayHints.bindingModeHints.enable": true,
+    "rust-analyzer.inlayHints.closureCaptureHints.enable": true,
+    "rust-analyzer.inlayHints.implicitDrops.enable": true
+}
