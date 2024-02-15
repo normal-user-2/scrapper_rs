@@ -12,4 +12,7 @@
   - [ ] Extracted category
   - [ ] Extracted author
 - [ ] Setup Axum
-- [ ] Create API to get the data
+  - [ ] Create API to get the data
+- [ ] Setup Actix
+  - [ ] Create API to get the data
+- [ ] Compare the performance between Axum and Actix
