@@ -1,30 +1,48 @@
 mod ext_web;
+mod page;
+mod page_type;
 mod scrapper;
+mod site;
 
+use anyhow::{anyhow, Result};
 use ext_web::ext_web::ExtWeb;
-use migration::{Migrator, MigratorTrait};
-use sea_orm::{Database, DatabaseConnection};
-
-const DB_NAME: &str = "learning_rust";
-const DATABASE_URL: &str = "postgres://postgres:postgres@localhost:5432";
+use sqlx::{migrate, postgres::PgPoolOptions};
+use std::{env, ops::Not};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let db = get_db().await;
+async fn main() -> Result<()> {
+    // if environment is not set or it's set but it's not 'prod' or 'staging'
+    // then we load envs from dev.env file
+    if env::var("ENVIRONMENT")
+        .map(|v| v != "prod" && v != "staging")
+        .unwrap_or(true)
+    {
+        println!("loading .env");
+        dotenvy::from_filename(".env").expect("failed to load .env");
+    }
 
-    let ews = ExtWeb::new(db);
+    if let Some(missing) = ensure_envs(&["ENVIRONMENT", "DATABASE_URL"]) {
+        return Err(anyhow!("Missing env vars: {:?}", missing));
+    }
+
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&env::var("DATABASE_URL")?)
+        .await?;
+
+
+    let ews = ExtWeb::new(pool);
 
     ews.sync().await;
 
     Ok(())
 }
 
-async fn get_db() -> DatabaseConnection {
-    let db = Database::connect(&format!("{}/{}", DATABASE_URL, DB_NAME))
-        .await
-        .expect("failed to connect to db");
-
-    Migrator::up(&db, None).await.expect("failed to migrate");
-
-    db
+fn ensure_envs<'a>(envs: &'a [&'a str]) -> Option<Vec<&'a str>> {
+    let out = envs
+        .iter()
+        .copied()
+        .filter(|env| env::var(env).is_err())
+        .collect::<Vec<_>>();
+    out.is_empty().not().then_some(out)
 }

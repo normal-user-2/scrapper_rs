@@ -1,5 +1,6 @@
-use sea_orm::DatabaseConnection;
+use sqlx::{Pool, Postgres};
+
 
 pub trait Scrapper {
-    fn sync_locations(&self, db: &DatabaseConnection) -> Vec<String>;
+    fn sync_locations(&self, pool: &Pool<Postgres>) -> Vec<String>;
 }

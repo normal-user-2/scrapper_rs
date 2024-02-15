@@ -16,3 +16,11 @@
 - [ ] Setup Actix
   - [ ] Create API to get the data
 - [ ] Compare the performance between Axum and Actix
+
+### Setup
+
+- Create `.env` file
+  ```env
+  DATABASE_URL=postgresql://postgres:password@localhost:5432/learning_rust
+  ENVIRONMENT=dev
+  ```

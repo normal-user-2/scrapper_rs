@@ -1,21 +1,18 @@
-use sea_orm::DatabaseConnection;
-
 use super::helper;
-use entity::enums::Site::JFL;
+use crate::site::JFL;
 use select::document::Document;
 use select::predicate::{Attr, Class, Name, Predicate};
+use sqlx::{Pool, Postgres};
 
-pub async fn sync_locations(db: &DatabaseConnection) -> Vec<String> {
+pub async fn sync_locations(pool: &Pool<Postgres>) {
     let mut urls = helper::fetch_sitemap("https://journeyforlight.wordpress.com/sitemap.xml").await;
 
     // skip url containing: journeyforlight.files.wordpress.com
     urls.retain(|url| !url.contains("journeyforlight.files.wordpress.com"));
 
     for url in &urls {
-        helper::save_location(JFL, url, db).await;
+        helper::save_location(JFL, url, &pool).await;
     }
-
-    urls
 }
 
 pub async fn extract_title(body: &String) -> String {
