@@ -5,7 +5,7 @@
 - [ ] Setup SQLx
 - [ ] Scrap any wordpress blog
 - [ ] Save into database (page model/table)
-- [ ] Extract article body (post model/table)
+- [ ] Extract article data (post model/table)
   - [ ] Normalized body
   - [ ] Extracted title
   - [ ] Extracted thumbnail_image
