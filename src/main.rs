@@ -4,13 +4,13 @@ mod page_type;
 mod scrapper;
 mod site;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
 use ext_web::ext_web::ExtWeb;
-use sqlx::{migrate, postgres::PgPoolOptions};
+use sqlx::postgres::PgPoolOptions;
 use std::{env, ops::Not};
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), Error> {
     // if environment is not set or it's set but it's not 'prod' or 'staging'
     // then we load envs from dev.env file
     if env::var("ENVIRONMENT")
@@ -30,10 +30,9 @@ async fn main() -> Result<()> {
         .connect(&env::var("DATABASE_URL")?)
         .await?;
 
-
     let ews = ExtWeb::new(pool);
 
-    ews.sync().await;
+    ews.sync().await?;
 
     Ok(())
 }

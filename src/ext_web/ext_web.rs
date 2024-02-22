@@ -1,18 +1,9 @@
-// use entity::enums::Site;
-
-use std::sync::Arc;
-
+use super::{helper, jfl};
 use crate::site::JFL;
-// use sea_orm::{ActiveModelTrait, DatabaseConnection, QueryOrder};
-use sqlx::{pool::PoolConnection, Pool, Postgres};
-
-use crate::ext_web::helper;
-
-use super::jfl::{self};
+use anyhow::{anyhow, Error, Ok};
 use chrono::Utc;
-// use entity::page;
-// use entity::page::Entity as Page;
-// use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, Set};
+use futures::TryStreamExt;
+use sqlx::{postgres::PgRow, Pool, Postgres, Row};
 
 pub struct ExtWeb {
     pool: Pool<Postgres>,
@@ -27,89 +18,129 @@ impl ExtWeb {
         }
     }
 
-    pub async fn sync(&self) {
+    pub async fn sync(&self) -> Result<(), Error> {
         for site in &self.sites {
             // location
-            self.sync_locations(site).await;
+            self.sync_locations(site).await?;
 
             // source
-            // self.sync_source(site).await;
+            self.sync_sources(site).await?;
         }
+
+        Ok(())
     }
 
-    async fn sync_locations(&self, site: &str) {
+    async fn sync_locations(&self, site: &str) -> Result<(), Error> {
         println!("Syncing locations for site: {:?}", site);
 
         match site {
-            JFL => jfl::sync_locations(&self.pool).await,
+            JFL => jfl::sync_locations(&self.pool).await?,
             _ => {
                 println!("Site not found: {:?}", site);
             }
         };
+
+        Ok(())
     }
 
-    // async fn sync_source(&self, site: &Site) {
-    //     println!("{:?} syncing sources", site);
+    async fn sync_sources(&self, site: &str) -> Result<(), Error> {
+        println!("{:?} syncing sources", site);
 
-    //     let pages = Page::find()
-    //         .order_by_desc(page::Column::Id)
-    //         .filter(Condition::all().add(page::Column::Site.eq(site.clone())))
-    //         .all(&self.pool)
-    //         .await;
+        let mut rows = sqlx::query(
+            r#"
+            SELECT *
+            FROM pages
+            WHERE site = $1
+            ORDER by id ASC
+        "#,
+        )
+        .bind(site)
+        .fetch(&self.pool);
 
-    //     if pages.is_err() {
-    //         println!("{:?} failed to fetch pages: {:?}", site, pages.err());
-    //         return;
-    //     }
+        let mut n = 1;
 
-    //     let pages = pages.unwrap();
+        while let Some(row) = rows.try_next().await? {
+            // map the row into a user-defined domain type
+            self.sync_source(row, site).await?;
 
-    //     for page in pages {
-    //         let loc = page.location.clone();
+            if n % 50 == 0 {
+                println!("Synced {:?} pages", n);
+            }
 
-    //         let source = helper::get_url_body(&loc).await;
+            n += 1;
+        }
 
-    //         if source == "" {
-    //             println!("{:?} failed to fetch source for page: {:?}", site, loc);
-    //             continue;
-    //         }
+        Ok(())
+    }
 
-    //         if let Some(existing_source) = &page.source {
-    //             if existing_source.eq(&source) {
-    //                 continue;
-    //             }
-    //         }
+    async fn sync_source(&self, row: PgRow, site: &str) -> Result<(), Error> {
+        let loc: &str = row.try_get("location")?;
+        let synced_source: Option<String> = row.try_get("source")?;
+        let synced_title: Option<String> = row.try_get("title")?;
+        let id: i64 = row.try_get("id")?;
 
-    //         println!("{:?}, new source found for page: {:?}", site, loc);
+        let source: String = helper::get_url_body(loc).await?;
 
-    //         let mut title: String;
-    //         match site {
-    //             Site::JFL => {
-    //                 title = jfl::extract_title(&source).await;
-    //             }
-    //         }
-    //         title = helper::normalize_title(title);
+        if source.is_empty() {
+            println!("{:?} failed to fetch source for page: {:?}", site, loc);
+            return Err(anyhow!("Failed to fetch source for page: {:?}", loc));
+        }
 
-    //         // update source and page
+        if synced_source.is_some() && synced_source.unwrap().eq(&source) {
+            if synced_title.is_none() {
+                let title = self.get_title(&source, site)?;
 
-    //         let current_time = Utc::now().naive_utc();
+                println!("{}, updating title: {}, loc: {}", site, title, loc);
 
-    //         let mut page: page::ActiveModel = page.into();
-    //         page.source = Set(Some(source));
-    //         page.title = Set(Some(title));
+                let _ = sqlx::query!(
+                    r#"
+                    UPDATE pages
+                    SET title = $1, updated_at = $2
+                    WHERE id = $3
+                    "#,
+                    title,
+                    Utc::now(),
+                    id,
+                ).execute(&self.pool).await?;
+            }
 
-    //         page.updated_at = Set(current_time);
+            return Ok(());
+        }
 
-    //         let updated_page = page.update(&self.pool).await;
+        let title = self.get_title(&source, site)?;
 
-    //         match updated_page {
-    //             Ok(_) => {
-    //                 continue;
-    //             }
-    //             Err(e) => {
-    //                 println!("{:?} failed to update page: {:?}", site, e);
-    //             }
-    //         }
-    //     }
-    // }
+        println!("{}, new source, title: {}, loc: {}", site, title, loc);
+
+        // update source and page
+        let _ = sqlx::query!(
+            r#"
+            UPDATE pages
+            SET source = $1, title = $2, updated_at = $3
+            WHERE id = $4
+            "#,
+            source,
+            title,
+            Utc::now(),
+            id,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    fn get_title(&self, source: &String, site: &str) -> Result<String, Error> {
+        let mut title: String;
+        match site {
+            JFL => {
+                title = jfl::extract_title(source);
+            }
+            _ => {
+                return Err(anyhow!("Site not found: {:?}", site));
+            }
+        }
+        title = helper::normalize_title(title);
+
+        Ok(title)
+    }
 }

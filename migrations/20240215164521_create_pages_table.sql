@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS pages (
     site VARCHAR(64) NOT NULL,
     page_type VARCHAR(255) NOT NULL,
     location VARCHAR(255) NOT NULL,
-    source VARCHAR(255),
+    source TEXT,
     is_approved BOOLEAN NOT NULL DEFAULT FALSE,
     is_ignored BOOLEAN NOT NULL DEFAULT FALSE,
     magazine_year INTEGER,
