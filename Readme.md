@@ -2,7 +2,7 @@
 
 ### Goal
 
-- [-] Setup SQLx
+- [x] Setup SQLx
 - [ ] Scrap any wordpress blog
 - [ ] Save into database (page model/table)
 - [ ] Extract article data (post model/table)
