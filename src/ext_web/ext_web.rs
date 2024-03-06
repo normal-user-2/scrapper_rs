@@ -79,7 +79,8 @@ impl ExtWeb {
         let synced_title: Option<String> = row.try_get("title")?;
         let id: i64 = row.try_get("id")?;
 
-        let source: String = helper::get_url_body(loc).await?;
+        let mut source: String = helper::get_url_body(loc).await?;
+        source = source.trim().into();
 
         if source.is_empty() {
             println!("{:?} failed to fetch source for page: {:?}", site, loc);
@@ -101,7 +102,9 @@ impl ExtWeb {
                     title,
                     Utc::now(),
                     id,
-                ).execute(&self.pool).await?;
+                )
+                .execute(&self.pool)
+                .await?;
             }
 
             return Ok(());

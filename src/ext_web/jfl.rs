@@ -15,6 +15,9 @@ pub async fn sync_locations(pool: &Pool<Postgres>) -> Result<(), Error> {
     println!("jfl, found {} urls", urls.len());
 
     for url in &urls {
+        if url.eq("https://journeyforlight.wordpress.com") {
+            continue;
+        }
         helper::save_location(JFL, url, &pool).await?;
     }
 

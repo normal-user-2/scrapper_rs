@@ -2,15 +2,21 @@ mod ext_web;
 mod page;
 mod page_type;
 mod scrapper;
+mod server;
 mod site;
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Result};
 use ext_web::ext_web::ExtWeb;
+use server::server::Server;
 use sqlx::postgres::PgPoolOptions;
-use std::{env, ops::Not};
+use std::{env, ops::Not, sync::Arc};
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<(), anyhow::Error> {
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .init();
+
     // if environment is not set or it's set but it's not 'prod' or 'staging'
     // then we load envs from dev.env file
     if env::var("ENVIRONMENT")
@@ -21,7 +27,7 @@ async fn main() -> Result<(), Error> {
         dotenvy::from_filename(".env").expect("failed to load .env");
     }
 
-    if let Some(missing) = ensure_envs(&["ENVIRONMENT", "DATABASE_URL"]) {
+    if let Some(missing) = ensure_envs(&["ENVIRONMENT", "DATABASE_URL", "PORT"]) {
         return Err(anyhow!("Missing env vars: {:?}", missing));
     }
 
@@ -30,9 +36,13 @@ async fn main() -> Result<(), Error> {
         .connect(&env::var("DATABASE_URL")?)
         .await?;
 
-    let ews = ExtWeb::new(pool);
+    let server = Server::new(pool.clone(), ExtWeb::new(pool.clone()));
 
-    ews.sync().await?;
+    server.start(&env::var("PORT")?).await?;
+
+    // let str = Arc::new(String::from("asdf"));
+    // let str: Arc<String> = Arc::new("asdf".to_string());
+    // let str: Arc<String> = Arc::new("asdf".into());
 
     Ok(())
 }
